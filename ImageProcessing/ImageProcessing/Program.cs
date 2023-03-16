@@ -9,16 +9,18 @@ using System.Drawing;
 using Emgu.CV;
 using Emgu.CV.Structure;
 using Emgu.CV.CvEnum;
-
+using Emgu.CV.Util;
+using System.Drawing.Imaging;
 
 class ImageProcessing { 
     static void Main(String[] args)
     {
-        Mat pic = CvInvoke.Imread(@"C:\Users\denni\source\repos\ImageProcessing\ImageProcessing\tshirt4.jpg");
+        Bitmap bmp = new Bitmap(Image.FromFile(@"C:\Users\denni\source\repos\Imageprocessing-for-measurement-app-malvacom\ImageProcessing\ImageProcessing\tshirt4.jpg"));
+        Mat pic = CvInvoke.Imread(@"C:\Users\denni\source\repos\Imageprocessing-for-measurement-app-malvacom\ImageProcessing\ImageProcessing\tshirt4.jpg");
 
         // Gaussian blur the image
         Mat gaussianBlur = new Mat();
-        CvInvoke.GaussianBlur(pic, gaussianBlur, new System.Drawing.Size(3, 3), 5.0);
+        CvInvoke.GaussianBlur(pic, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
 
 
         // Sobel algorithm for edge detection
@@ -53,16 +55,22 @@ class ImageProcessing {
 
         CvInvoke.Imshow("canny", edgePic);
 
+        Bitmap edgeBmp = edgePic.ToBitmap();
 
         // Continued work
-        Bitmap bitmap = Emgu.CV.BitmapExtension.ToBitmap(edgePic);
-
-        for (int y = 0; y < bitmap.Height; y++) {
-            for (int x = 0; x < bitmap.Width; x++) {
-                var pixel = bitmap.GetPixel(x, y);
-                
+        for (int y = 0; y < bmp.Height; y++)
+        {
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var pixel = edgeBmp.GetPixel(x,y);
+                var r = pixel.R; var g = pixel.G; var b = pixel.B;
+                var colorSum = r + g + b;
+                if (colorSum == 0) bmp.SetPixel(x,y, Color.Transparent);
             }
         }
+
+        bmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
+        Console.WriteLine("Result exported");
 
         CvInvoke.WaitKey();
     }
