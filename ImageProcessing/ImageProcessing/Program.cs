@@ -26,6 +26,8 @@ class ImageProcessing {
         Mat sobelY = new Mat();
         Mat sobelXY = new Mat();
 
+        Console.Write("HEJ");
+
         pic.CopyTo(sobelX);
         pic.CopyTo(sobelY);
         pic.CopyTo(sobelXY);
