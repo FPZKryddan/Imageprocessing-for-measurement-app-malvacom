@@ -15,8 +15,8 @@ using System.Drawing.Imaging;
 class ImageProcessing { 
     static void Main(String[] args)
     {
-        Bitmap bmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt2.jpg"));
-        Mat pic = CvInvoke.Imread(@"..\..\..\tshirt2.jpg");
+        Bitmap bmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt4.jpg"));
+        Mat pic = CvInvoke.Imread(@"..\..\..\tshirt4.jpg");
 
         // Gaussian blur the image
         Mat gaussianBlur = new Mat();
@@ -85,12 +85,54 @@ class ImageProcessing {
         }
 
 
+        // Get t-shirt position in image
+        int minX = int.MaxValue;
+        int maxX = int.MinValue;
+        int minY = int.MaxValue;
+        int maxY = int.MinValue;
+        for (int y = 0; y < bmp.Height; y++)
+        {
+            for (int x = 0; x < bmp.Width; x++)
+            {
+                var pixel = edgeBmp.GetPixel(x, y);
+                var r = pixel.R; var g = pixel.G; var b = pixel.B;
+                var colorSum = r + g + b;
 
+                if (colorSum != 0)
+                {
+                    if (x < minX) minX = x;
+                    else if (x > maxX) maxX = x;
 
-        CvInvoke.Imwrite("edge.png", edgePic);
+                    if (y < minY) minY = y;
+                    else if (y > maxY) maxY = y;
+                }
+            }
+        }
+
+        // Crop image to t-shirt boundaries
+        int width = maxX - minX;
+        int height = maxY - minY;
+        Bitmap croppedImage = new Bitmap(width, height);
+        for (int y = minY; y < height + minY; y++)
+        {
+            for (int x = minX; x < width + minX; x++)
+            {
+                var pixel = bmp.GetPixel(x, y);
+                var r = pixel.R; var g = pixel.G; var b = pixel.B;
+                var colorSum = r + g + b;
+
+                if (colorSum != 0)
+                {
+                    croppedImage.SetPixel(x-minX, y-minY, Color.FromArgb(pixel.ToArgb()));
+                }
+            }
+        }
 
         bmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
-        Console.WriteLine("Result exported");
+        Console.WriteLine("Removed Background Result exported");
+
+        croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
+        Console.WriteLine("Cropped Result exported");
 
         CvInvoke.WaitKey();
     }
