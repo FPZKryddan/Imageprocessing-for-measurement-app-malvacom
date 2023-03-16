@@ -11,10 +11,14 @@ using Emgu.CV.Structure;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Util;
 using System.Drawing.Imaging;
+using System.Diagnostics;
 
 class ImageProcessing { 
     static void Main(String[] args)
     {
+        var stopwatch = new Stopwatch();
+        stopwatch.Start(); 
+
         Bitmap imageBmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt4.jpg"));
         Mat imageMat = CvInvoke.Imread(@"..\..\..\tshirt4.jpg");
 
@@ -34,6 +38,9 @@ class ImageProcessing {
         CvInvoke.Canny(gaussianBlur, edgeImageMat, lowerThreshold, upperThreshold, 3, true);
 
         CvInvoke.Imshow("canny", edgeImageMat);
+
+        // Capture time taken for canny algorithm
+        double cannyTime = stopwatch.ElapsedMilliseconds;
 
         // Remove background of image
         Bitmap edgeimageBmp = edgeImageMat.ToBitmap();
@@ -102,6 +109,9 @@ class ImageProcessing {
             }
         }
 
+        // Capture time taken for removing background
+        double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
+
         // Crop image to t-shirt boundaries
         int width = maxX - minX;
         int height = maxY - minY;
@@ -118,12 +128,23 @@ class ImageProcessing {
             }
         }
 
+        // Capture time taken for cropping the image
+        double croppingTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime;
+
         // Export results
         imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
         Console.WriteLine("Removed Background Result exported");
 
         croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
         Console.WriteLine("Cropped Result exported");
+
+        // Displaying time diagnostics
+        stopwatch.Stop();
+        double elapsed_time = stopwatch.ElapsedMilliseconds;
+        Console.WriteLine("Time to perform canny: " + cannyTime + "ms");
+        Console.WriteLine("Time to remove background: " + removeBackgroundTime + "ms");
+        Console.WriteLine("Time to crop image: " + croppingTime + "ms");
+        Console.WriteLine("Time taken in total: " + elapsed_time + "ms");
 
         CvInvoke.WaitKey();
     }
