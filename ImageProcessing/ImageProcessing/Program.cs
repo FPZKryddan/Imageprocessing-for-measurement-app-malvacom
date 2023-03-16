@@ -43,14 +43,51 @@ class ImageProcessing {
         double cannyTime = stopwatch.ElapsedMilliseconds;
 
         // Remove background of image
-        Bitmap edgeimageBmp = edgeImageMat.ToBitmap();
+        Bitmap edgeImageBmp = edgeImageMat.ToBitmap();
 
         // Position of t-shirt values
-        int minX = int.MaxValue;
-        int maxX = int.MinValue;
-        int minY = int.MaxValue;
-        int maxY = int.MinValue;
+        int[,] positions = new int[2, 2];
+        positions[0, 0] = int.MaxValue; // min in X
+        positions[0, 1] = int.MinValue; // max in X
+        positions[1, 0] = int.MaxValue; // min in Y
+        positions[1, 1] = int.MinValue; // max in Y
 
+        removeBackground(imageBmp, edgeImageBmp, positions);
+
+        // Capture time taken for removing background
+        double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
+
+        // Crop image to t-shirt boundaries
+        int width = positions[0, 1] - positions[0, 0];
+        int height = positions[1, 1] - positions[1, 0];
+        Bitmap croppedImage = new Bitmap(width, height);
+        cropImage(imageBmp, croppedImage, positions, width, height);
+        
+        // Capture time taken for cropping the image
+        double croppingTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime;
+
+        // Export results
+        imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
+        Console.WriteLine("Removed Background Result exported");
+
+        croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
+        Console.WriteLine("Cropped Result exported");
+
+        // Displaying time diagnostics
+        stopwatch.Stop();
+        double elapsed_time = stopwatch.ElapsedMilliseconds;
+        Console.WriteLine("Time to perform canny: " + cannyTime + "ms");
+        Console.WriteLine("Time to remove background: " + removeBackgroundTime + "ms");
+        Console.WriteLine("Time to crop image: " + croppingTime + "ms");
+        Console.WriteLine("Time taken in total: " + elapsed_time + "ms");
+
+        CvInvoke.Imwrite("edge.png", edgeImageMat);
+
+        CvInvoke.WaitKey();
+    }
+
+    static void removeBackground(Bitmap imageBmp, Bitmap edgeImageBmp, int[,] positions)
+    {
         // Fill in edges
         for (int x = 0; x < imageBmp.Width; x++)
         {
@@ -62,18 +99,18 @@ class ImageProcessing {
             for (int y = 0; y < imageBmp.Height; y++)
             {
                 // get current pixel values
-                var pixel = edgeimageBmp.GetPixel(x,y);
+                var pixel = edgeImageBmp.GetPixel(x, y);
                 var r = pixel.R; var g = pixel.G; var b = pixel.B;
                 var colorSum = r + g + b;
 
                 // Getting the position of the t-shirt for cropping later
                 if (colorSum != 0)
                 {
-                    if (x < minX) minX = x;
-                    else if (x > maxX) maxX = x;
+                    if (x < positions[0, 0]) positions[0, 0] = x;
+                    else if (x > positions[0, 1]) positions[0, 1] = x;
 
-                    if (y < minY) minY = y;
-                    else if (y > maxY) maxY = y;
+                    if (y < positions[1, 0]) positions[1, 0] = y;
+                    else if (y > positions[1, 1]) positions[1, 1] = y;
                 }
 
                 // Entering the object
@@ -83,12 +120,12 @@ class ImageProcessing {
                     distanceFromEdge = 0;
                     imageBmp.SetPixel(x, y, Color.Transparent);
                     continue;
-                } 
+                }
                 // Exiting the object
                 else if (colorSum != 0 && inObject && distanceFromEdge > 2)
                 {
                     inObject = false;
-                    for (int i = 0; i < pixelsTBD.Length; i++) pixelsTBD[i] = 0;
+                    Array.Clear(pixelsTBD, 0, pixelsTBD.Length);
                     columnDone = true;
                 }
 
@@ -108,44 +145,20 @@ class ImageProcessing {
                     if (pixelsTBD[y] == 1) imageBmp.SetPixel(x, y, Color.Transparent);
             }
         }
+    }
 
-        // Capture time taken for removing background
-        double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
-
-        // Crop image to t-shirt boundaries
-        int width = maxX - minX;
-        int height = maxY - minY;
-        Bitmap croppedImage = new Bitmap(width, height);
-        for (int y = minY; y < height + minY; y++)
+    static void cropImage(Bitmap srcImage, Bitmap dstImage, int[,] positions, int width, int height)
+    {
+        for (int y = positions[1, 0]; y < height + positions[1, 0]; y++)
         {
-            for (int x = minX; x < width + minX; x++)
+            for (int x = positions[0, 0]; x < width + positions[0, 0]; x++)
             {
-                var pixel = imageBmp.GetPixel(x, y);
+                var pixel = srcImage.GetPixel(x, y);
                 var r = pixel.R; var g = pixel.G; var b = pixel.B;
                 var colorSum = r + g + b;
 
-                if (colorSum != 0) croppedImage.SetPixel(x - minX, y - minY, Color.FromArgb(pixel.ToArgb()));
+                if (colorSum != 0) dstImage.SetPixel(x - positions[0, 0], y - positions[1, 0], Color.FromArgb(pixel.ToArgb()));
             }
         }
-
-        // Capture time taken for cropping the image
-        double croppingTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime;
-
-        // Export results
-        imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
-        Console.WriteLine("Removed Background Result exported");
-
-        croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
-        Console.WriteLine("Cropped Result exported");
-
-        // Displaying time diagnostics
-        stopwatch.Stop();
-        double elapsed_time = stopwatch.ElapsedMilliseconds;
-        Console.WriteLine("Time to perform canny: " + cannyTime + "ms");
-        Console.WriteLine("Time to remove background: " + removeBackgroundTime + "ms");
-        Console.WriteLine("Time to crop image: " + croppingTime + "ms");
-        Console.WriteLine("Time taken in total: " + elapsed_time + "ms");
-
-        CvInvoke.WaitKey();
     }
 }
