@@ -15,89 +15,51 @@ using System.Drawing.Imaging;
 class ImageProcessing { 
     static void Main(String[] args)
     {
-        Bitmap bmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt4.jpg"));
-        Mat pic = CvInvoke.Imread(@"..\..\..\tshirt4.jpg");
+        Bitmap imageBmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt4.jpg"));
+        Mat imageMat = CvInvoke.Imread(@"..\..\..\tshirt4.jpg");
 
         // Gaussian blur the image
         Mat gaussianBlur = new Mat();
-        CvInvoke.GaussianBlur(pic, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
+        CvInvoke.GaussianBlur(imageMat, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
 
 
         // Canny algorithm for edge detection
-        Mat edgePic =  new Mat();
+        Mat edgeImageMat =  new Mat();
 
-        var average = pic.ToImage<Gray, byte>().GetAverage();
+        var average = imageMat.ToImage<Gray, byte>().GetAverage();
 
         var lowerThreshold = Math.Max(0, (1.0 - 0.33) * average.Intensity);
         var upperThreshold = Math.Max(255, (1.0 + 0.33) * average.Intensity);
 
-        CvInvoke.Canny(gaussianBlur, edgePic, lowerThreshold, upperThreshold, 3, true);
+        CvInvoke.Canny(gaussianBlur, edgeImageMat, lowerThreshold, upperThreshold, 3, true);
 
-        CvInvoke.Imshow("canny", edgePic);
+        CvInvoke.Imshow("canny", edgeImageMat);
 
-        Bitmap edgeBmp = edgePic.ToBitmap();
+        // Remove background of image
+        Bitmap edgeimageBmp = edgeImageMat.ToBitmap();
 
-        // Fill in edges
-        for (int x = 0; x < bmp.Width; x++)
-        {
-            bool inEdge = false;
-            bool done = false;
-            int edgeDistance = 0;
-            int[] pixelsPTR = new int[bmp.Height];
-            for (int y = 0; y < bmp.Height; y++)
-            {
-                var pixel = edgeBmp.GetPixel(x,y);
-                var r = pixel.R; var g = pixel.G; var b = pixel.B;
-                var colorSum = r + g + b;
-
-                if (colorSum != 0 && !inEdge && !done)
-                {
-                    inEdge = true;
-                    edgeDistance = 0;
-                    bmp.SetPixel(x, y, Color.Transparent);
-                    continue;
-                }
-                else if (colorSum != 0 && inEdge && edgeDistance > 2)
-                {
-                    inEdge = false;
-                    for (int i = 0; i < pixelsPTR.Length; i++) pixelsPTR[i] = 0;
-                    done = true;
-                }
-
-                if (!inEdge) bmp.SetPixel(x, y, Color.Transparent);
-                else
-                {
-                    edgeDistance++;
-                    pixelsPTR[y] = 1;
-                }
-            }
-
-            if (inEdge && edgeDistance > 2)
-            {
-                for (int y = 0; y < bmp.Height; y++)
-                {
-                    if (pixelsPTR[y] == 1)
-                    {
-                        bmp.SetPixel(x, y, Color.Transparent);
-                    }
-                }
-            }
-        }
-
-
-        // Get t-shirt position in image
+        // Position of t-shirt values
         int minX = int.MaxValue;
         int maxX = int.MinValue;
         int minY = int.MaxValue;
         int maxY = int.MinValue;
-        for (int y = 0; y < bmp.Height; y++)
+
+        // Fill in edges
+        for (int x = 0; x < imageBmp.Width; x++)
         {
-            for (int x = 0; x < bmp.Width; x++)
+            bool inObject = false;
+            bool columnDone = false;
+            int distanceFromEdge = 0;
+            int[] pixelsTBD = new int[imageBmp.Height]; // Pixels that might need to get deleted
+
+            for (int y = 0; y < imageBmp.Height; y++)
             {
-                var pixel = edgeBmp.GetPixel(x, y);
+                // get current pixel values
+                var pixel = edgeimageBmp.GetPixel(x,y);
                 var r = pixel.R; var g = pixel.G; var b = pixel.B;
                 var colorSum = r + g + b;
 
+                // Getting the position of the t-shirt for cropping later
                 if (colorSum != 0)
                 {
                     if (x < minX) minX = x;
@@ -106,6 +68,37 @@ class ImageProcessing {
                     if (y < minY) minY = y;
                     else if (y > maxY) maxY = y;
                 }
+
+                // Entering the object
+                if (colorSum != 0 && !inObject && !columnDone)
+                {
+                    inObject = true;
+                    distanceFromEdge = 0;
+                    imageBmp.SetPixel(x, y, Color.Transparent);
+                    continue;
+                } 
+                // Exiting the object
+                else if (colorSum != 0 && inObject && distanceFromEdge > 2)
+                {
+                    inObject = false;
+                    for (int i = 0; i < pixelsTBD.Length; i++) pixelsTBD[i] = 0;
+                    columnDone = true;
+                }
+
+                // if we are outside the object then turn the pixel transparent, otherwise increase distance from edge and add pixels to pixelsTBD.
+                if (!inObject) imageBmp.SetPixel(x, y, Color.Transparent);
+                else
+                {
+                    distanceFromEdge++;
+                    pixelsTBD[y] = 1;
+                }
+            }
+
+            // If we have pixels in pixelsTBD and we never found a exiting edge in this column then remove all pixels in pixelsTBD.
+            if (inObject && distanceFromEdge > 2)
+            {
+                for (int y = 0; y < imageBmp.Height; y++)
+                    if (pixelsTBD[y] == 1) imageBmp.SetPixel(x, y, Color.Transparent);
             }
         }
 
@@ -117,18 +110,16 @@ class ImageProcessing {
         {
             for (int x = minX; x < width + minX; x++)
             {
-                var pixel = bmp.GetPixel(x, y);
+                var pixel = imageBmp.GetPixel(x, y);
                 var r = pixel.R; var g = pixel.G; var b = pixel.B;
                 var colorSum = r + g + b;
 
-                if (colorSum != 0)
-                {
-                    croppedImage.SetPixel(x-minX, y-minY, Color.FromArgb(pixel.ToArgb()));
-                }
+                if (colorSum != 0) croppedImage.SetPixel(x - minX, y - minY, Color.FromArgb(pixel.ToArgb()));
             }
         }
 
-        bmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
+        // Export results
+        imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
         Console.WriteLine("Removed Background Result exported");
 
         croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
