@@ -15,32 +15,12 @@ using System.Drawing.Imaging;
 class ImageProcessing { 
     static void Main(String[] args)
     {
-        Bitmap bmp = new Bitmap(Image.FromFile(@"C:\Users\denni\source\repos\Imageprocessing-for-measurement-app-malvacom\ImageProcessing\ImageProcessing\tshirt4.jpg"));
-        Mat pic = CvInvoke.Imread(@"C:\Users\denni\source\repos\Imageprocessing-for-measurement-app-malvacom\ImageProcessing\ImageProcessing\tshirt4.jpg");
+        Bitmap bmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt2.jpg"));
+        Mat pic = CvInvoke.Imread(@"..\..\..\tshirt2.jpg");
 
         // Gaussian blur the image
         Mat gaussianBlur = new Mat();
         CvInvoke.GaussianBlur(pic, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
-
-
-        // Sobel algorithm for edge detection
-        Mat sobelX = new Mat();
-        Mat sobelY = new Mat();
-        Mat sobelXY = new Mat();
-
-        Console.Write("HEJ");
-
-        pic.CopyTo(sobelX);
-        pic.CopyTo(sobelY);
-        pic.CopyTo(sobelXY);
-
-        CvInvoke.Sobel(gaussianBlur, sobelX, Emgu.CV.CvEnum.DepthType.Default, 1, 0, 5);
-        CvInvoke.Sobel(gaussianBlur, sobelY, Emgu.CV.CvEnum.DepthType.Default, 0, 1, 5);
-        CvInvoke.Sobel(gaussianBlur, sobelXY, Emgu.CV.CvEnum.DepthType.Default, 1, 1, 5);
-
-        CvInvoke.Imshow("sobelX", sobelX);
-        CvInvoke.Imshow("sobelY", sobelY);
-        CvInvoke.Imshow("sobelXY", sobelXY);
 
 
         // Canny algorithm for edge detection
@@ -57,17 +37,57 @@ class ImageProcessing {
 
         Bitmap edgeBmp = edgePic.ToBitmap();
 
-        // Continued work
-        for (int y = 0; y < bmp.Height; y++)
+        // Fill in edges
+        for (int x = 0; x < bmp.Width; x++)
         {
-            for (int x = 0; x < bmp.Width; x++)
+            bool inEdge = false;
+            bool done = false;
+            int edgeDistance = 0;
+            int[] pixelsPTR = new int[bmp.Height];
+            for (int y = 0; y < bmp.Height; y++)
             {
                 var pixel = edgeBmp.GetPixel(x,y);
                 var r = pixel.R; var g = pixel.G; var b = pixel.B;
                 var colorSum = r + g + b;
-                if (colorSum == 0) bmp.SetPixel(x,y, Color.Transparent);
+
+                if (colorSum != 0 && !inEdge && !done)
+                {
+                    inEdge = true;
+                    edgeDistance = 0;
+                    bmp.SetPixel(x, y, Color.Transparent);
+                    continue;
+                }
+                else if (colorSum != 0 && inEdge && edgeDistance > 2)
+                {
+                    inEdge = false;
+                    for (int i = 0; i < pixelsPTR.Length; i++) pixelsPTR[i] = 0;
+                    done = true;
+                }
+
+                if (!inEdge) bmp.SetPixel(x, y, Color.Transparent);
+                else
+                {
+                    edgeDistance++;
+                    pixelsPTR[y] = 1;
+                }
+            }
+
+            if (inEdge && edgeDistance > 2)
+            {
+                for (int y = 0; y < bmp.Height; y++)
+                {
+                    if (pixelsPTR[y] == 1)
+                    {
+                        bmp.SetPixel(x, y, Color.Transparent);
+                    }
+                }
             }
         }
+
+
+
+
+        CvInvoke.Imwrite("edge.png", edgePic);
 
         bmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
         Console.WriteLine("Result exported");
