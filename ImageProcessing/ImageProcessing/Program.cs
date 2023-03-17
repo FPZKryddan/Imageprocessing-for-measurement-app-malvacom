@@ -13,9 +13,10 @@ using Emgu.CV.Util;
 using System.Drawing.Imaging;
 using System.Diagnostics;
 
-class ImageProcessing { 
+class ImageProcessing {
     static void Main(String[] args)
     {
+
         var stopwatch = new Stopwatch();
         stopwatch.Start(); 
 
@@ -53,18 +54,27 @@ class ImageProcessing {
         positions[1, 1] = int.MinValue; // max in Y
 
         removeBackground(imageBmp, edgeImageBmp, positions);
-
-        // Capture time taken for removing background
         double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
+
 
         // Crop image to t-shirt boundaries
         int width = positions[0, 1] - positions[0, 0];
         int height = positions[1, 1] - positions[1, 0];
         Bitmap croppedImage = new Bitmap(width, height);
         cropImage(imageBmp, croppedImage, positions, width, height);
-        
-        // Capture time taken for cropping the image
         double croppingTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime;
+
+
+        // Calculate waist in pixels
+        float waistMeasurement = 50;
+        float waistInPx = 0;
+        getScale(croppedImage, ref waistInPx, 50);
+        double getScaleTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime - croppingTime;
+
+        // Waist results
+        float pxPerCm = waistMeasurement / waistInPx;
+        Console.WriteLine("Waist in pixels: " + waistInPx);
+        Console.WriteLine("Pixels per cm: " + pxPerCm);
 
         // Export results
         imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
@@ -76,9 +86,11 @@ class ImageProcessing {
         // Displaying time diagnostics
         stopwatch.Stop();
         double elapsed_time = stopwatch.ElapsedMilliseconds;
+
         Console.WriteLine("Time to perform canny: " + cannyTime + "ms");
         Console.WriteLine("Time to remove background: " + removeBackgroundTime + "ms");
         Console.WriteLine("Time to crop image: " + croppingTime + "ms");
+        Console.WriteLine("Time to get scale: " + getScaleTime + "ms");
         Console.WriteLine("Time taken in total: " + elapsed_time + "ms");
 
         CvInvoke.Imwrite("edge.png", edgeImageMat);
@@ -160,5 +172,35 @@ class ImageProcessing {
                 if (colorSum != 0) dstImage.SetPixel(x - positions[0, 0], y - positions[1, 0], Color.FromArgb(pixel.ToArgb()));
             }
         }
+    }
+
+    static void getScale(Bitmap croppedImage, ref float waistInPx, int rayLength)
+    {
+        int start = 0;
+        int end = 0;
+        for (int x = 1; x < croppedImage.Width - 1; x++)
+        {
+            bool found = false;
+            for (int y = croppedImage.Height - 1; y > croppedImage.Height - rayLength; y--)
+            {
+                var pixel = croppedImage.GetPixel(x, y);
+                var a = pixel.A;
+
+                // if non transparent pixel found
+                if (a == 255)
+                {
+                    found = true;
+                    break;
+                }
+            }
+            // get edges of waist
+            if (found && start == 0) start = x;
+            else if (!found && end == 0 && start != 0)
+            {
+                end = x;
+                break;
+            }
+        }
+        waistInPx = end - start;
     }
 }
