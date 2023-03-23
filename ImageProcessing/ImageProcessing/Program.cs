@@ -52,8 +52,8 @@ class ImageProcessing {
         positions[0, 1] = int.MinValue; // max in X
         positions[1, 0] = int.MaxValue; // min in Y
         positions[1, 1] = int.MinValue; // max in Y
-
-        removeBackground(imageBmp, edgeImageBmp, positions);
+        
+        removeBackground(ref imageBmp, ref edgeImageBmp, positions);
         double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
 
 
@@ -61,14 +61,14 @@ class ImageProcessing {
         int width = positions[0, 1] - positions[0, 0];
         int height = positions[1, 1] - positions[1, 0];
         Bitmap croppedImage = new Bitmap(width, height);
-        cropImage(imageBmp, croppedImage, positions, width, height);
+        cropImage(ref imageBmp, ref croppedImage, positions, width, height);
         double croppingTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime;
 
 
         // Calculate waist in pixels
         float waistMeasurement = 50;
         float waistInPx = 0;
-        getScale(croppedImage, ref waistInPx, 50);
+        getScale(ref croppedImage, ref waistInPx, 50);
         double getScaleTime = stopwatch.ElapsedMilliseconds - cannyTime - removeBackgroundTime - croppingTime;
 
         // Waist results
@@ -98,7 +98,7 @@ class ImageProcessing {
         CvInvoke.WaitKey();
     }
 
-    static void removeBackground(Bitmap imageBmp, Bitmap edgeImageBmp, int[,] positions)
+    static void removeBackground(ref Bitmap imageBmp, ref Bitmap edgeImageBmp, int[,] positions)
     {
         // Fill in edges
         for (int x = 0; x < imageBmp.Width; x++)
@@ -111,12 +111,10 @@ class ImageProcessing {
             for (int y = 0; y < imageBmp.Height; y++)
             {
                 // get current pixel values
-                var pixel = edgeImageBmp.GetPixel(x, y);
-                var r = pixel.R; var g = pixel.G; var b = pixel.B;
-                var colorSum = r + g + b;
+                bool edge = isEdge(ref edgeImageBmp, x, y);
 
                 // Getting the position of the t-shirt for cropping later
-                if (colorSum != 0)
+                if (edge)
                 {
                     if (x < positions[0, 0]) positions[0, 0] = x;
                     else if (x > positions[0, 1]) positions[0, 1] = x;
@@ -126,7 +124,7 @@ class ImageProcessing {
                 }
 
                 // Entering the object
-                if (colorSum != 0 && !inObject && !columnDone)
+                if (edge && !inObject && !columnDone)
                 {
                     inObject = true;
                     distanceFromEdge = 0;
@@ -134,7 +132,7 @@ class ImageProcessing {
                     continue;
                 }
                 // Exiting the object
-                else if (colorSum != 0 && inObject && distanceFromEdge > 2)
+                else if (edge && inObject && distanceFromEdge > 2)
                 {
                     inObject = false;
                     Array.Clear(pixelsTBD, 0, pixelsTBD.Length);
@@ -159,7 +157,76 @@ class ImageProcessing {
         }
     }
 
-    static void cropImage(Bitmap srcImage, Bitmap dstImage, int[,] positions, int width, int height)
+    // **************EXPERIMENTAL********************
+
+    static bool findEdges(ref Bitmap edgeImageBmp, int x, int y)
+    {
+        bool vertical = findVerticalEdges(ref edgeImageBmp, x, y);
+        bool horizontal = findHorizontalEdges(ref edgeImageBmp, x, y);
+        if (!horizontal || !vertical) return false;
+        return true;
+    }
+    
+    static bool findVerticalEdges(ref Bitmap edgeImageBmp, int x, int y)
+    {
+        bool right = false;
+        bool left = false;
+        for (; x < edgeImageBmp.Width - 1; x++)
+        {
+            if (isEdge(ref edgeImageBmp, x, y))
+            {
+                right = true;
+                break;
+            }
+        }
+        for (; x > 0; x--)
+        {
+            if (isEdge(ref edgeImageBmp, x, y))
+            {
+                left = true;
+                break;
+            }
+        }
+        if (!right || !left) return false;
+        return true;
+    }
+
+    static bool findHorizontalEdges(ref Bitmap edgeImageBmp, int x, int y)
+    {
+        bool up = false;
+        bool down = false;
+        for (; y < edgeImageBmp.Height - 1; y++)
+        {
+            if (isEdge(ref edgeImageBmp, x, y))
+            {
+                down = true;
+                break;
+            }
+        }
+        for (; y > 0; y--)
+        {
+            if (isEdge(ref edgeImageBmp, x, y))
+            {
+                up = true;
+                break;
+            }
+        }
+        if (!up || !down) return false;
+        return true;
+    }
+
+    // **************END********************
+
+    static bool isEdge(ref Bitmap edgeImageBmp, int x, int y)
+    {
+        var pixel = edgeImageBmp.GetPixel(x, y);
+        var r = pixel.R; var g = pixel.G; var b = pixel.B;
+        var colorSum = r + g + b;
+        if (colorSum != 0) return true;
+        return false;
+    }
+
+    static void cropImage(ref Bitmap srcImage, ref Bitmap dstImage, int[,] positions, int width, int height)
     {
         for (int y = positions[1, 0]; y < height + positions[1, 0]; y++)
         {
@@ -174,7 +241,7 @@ class ImageProcessing {
         }
     }
 
-    static void getScale(Bitmap croppedImage, ref float waistInPx, int rayLength)
+    static void getScale(ref Bitmap croppedImage, ref float waistInPx, int rayLength)
     {
         int start = 0;
         int end = 0;
