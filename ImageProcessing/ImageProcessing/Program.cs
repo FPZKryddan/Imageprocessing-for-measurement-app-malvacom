@@ -1,44 +1,26 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.IO;
-using System.Drawing;
+﻿using System.Drawing;
 using Emgu.CV;
 using Emgu.CV.Structure;
-using Emgu.CV.CvEnum;
-using Emgu.CV.Util;
 using System.Drawing.Imaging;
 using System.Diagnostics;
 
 class ImageProcessing {
     static void Main(String[] args)
     {
-
-        var stopwatch = new Stopwatch();
-        stopwatch.Start(); 
-
         Bitmap imageBmp = new Bitmap(Image.FromFile(@"..\..\..\tshirt4.jpg"));
         Mat imageMat = CvInvoke.Imread(@"..\..\..\tshirt4.jpg");
+        Bitmap result = produceProcessedImage(ref imageMat, ref imageBmp);
+        result.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
+    }
 
-        // Gaussian blur the image
-        Mat gaussianBlur = new Mat();
-        CvInvoke.GaussianBlur(imageMat, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
-
+    static Bitmap produceProcessedImage(ref Mat imageMat, ref Bitmap imageBmp)
+    {
+        var stopwatch = new Stopwatch();
+        stopwatch.Start();
 
         // Canny algorithm for edge detection
-        Mat edgeImageMat =  new Mat();
-
-        var average = imageMat.ToImage<Gray, byte>().GetAverage();
-
-        var lowerThreshold = Math.Max(0, (1.0 - 0.33) * average.Intensity);
-        var upperThreshold = Math.Max(255, (1.0 + 0.33) * average.Intensity);
-
-        CvInvoke.Canny(gaussianBlur, edgeImageMat, lowerThreshold, upperThreshold, 3, true);
-
-        CvInvoke.Imshow("canny", edgeImageMat);
+        Mat edgeImageMat = new Mat();
+        cannyAlgorithm(ref imageMat, ref edgeImageMat);
 
         // Capture time taken for canny algorithm
         double cannyTime = stopwatch.ElapsedMilliseconds;
@@ -52,7 +34,7 @@ class ImageProcessing {
         positions[0, 1] = int.MinValue; // max in X
         positions[1, 0] = int.MaxValue; // min in Y
         positions[1, 1] = int.MinValue; // max in Y
-        
+
         removeBackground(ref imageBmp, ref edgeImageBmp, positions);
         double removeBackgroundTime = stopwatch.ElapsedMilliseconds - cannyTime;
 
@@ -73,15 +55,7 @@ class ImageProcessing {
 
         // Waist results
         float pxPerCm = waistMeasurement / waistInPx;
-        Console.WriteLine("Waist in pixels: " + waistInPx);
-        Console.WriteLine("Pixels per cm: " + pxPerCm);
 
-        // Export results
-        imageBmp.Save(".\\..\\..\\..\\result.png", ImageFormat.Png);
-        Console.WriteLine("Removed Background Result exported");
-
-        croppedImage.Save(".\\..\\..\\..\\cropresult.png", ImageFormat.Png);
-        Console.WriteLine("Cropped Result exported");
 
         // Displaying time diagnostics
         stopwatch.Stop();
@@ -93,11 +67,25 @@ class ImageProcessing {
         Console.WriteLine("Time to get scale: " + getScaleTime + "ms");
         Console.WriteLine("Time taken in total: " + elapsed_time + "ms");
 
-        CvInvoke.Imwrite("edge.png", edgeImageMat);
-
-        CvInvoke.WaitKey();
+        return croppedImage;
     }
 
+    static void cannyAlgorithm(ref Mat imageMat, ref Mat edgeImageMat)
+    {
+        // Gaussian blur the image
+        Mat gaussianBlur = new Mat();
+        CvInvoke.GaussianBlur(imageMat, gaussianBlur, new System.Drawing.Size(3, 3), 1.0);
+
+        var average = imageMat.ToImage<Gray, byte>().GetAverage();
+
+        var lowerThreshold = Math.Max(0, (1.0 - 0.33) * average.Intensity);
+        var upperThreshold = Math.Max(255, (1.0 + 0.33) * average.Intensity);
+
+        CvInvoke.Canny(gaussianBlur, edgeImageMat, lowerThreshold, upperThreshold, 3, true);
+
+        CvInvoke.Imshow("canny", edgeImageMat);
+
+    }
     static void removeBackground(ref Bitmap imageBmp, ref Bitmap edgeImageBmp, int[,] positions)
     {
         // Fill in edges
